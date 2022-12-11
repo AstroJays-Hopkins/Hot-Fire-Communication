@@ -3,47 +3,65 @@
 void setup() {
   Serial1.begin(9600);
   Serial.begin(9600);
+  Serial.print("Acquisiton starting.");
 }
 
-//char buffer[6];
 
-RingBuf<byte, 6> buf;
+//RingBuf<uint8_t, 6> buf;
 
-  char buffer[6];
+#define SIG 0x53
+uint8_t buffer[7];
+int pos;
+
+enum state_t {IDLE, RECEIVING, READY};
+
+
+state_t state = IDLE;
+
+unsigned long time_start = 0;
+int period = 100;
 
 void loop() {
   // if we get a read_request
-  receivechar();
-  for(int i = 0; i < 6; i++) {
-    //Serial.print(buffer[i]);
-  }
-  //Serial.println();
-  //if(buffer == "hello\n\0") {
-    //Serial.println("received handshake");
-  //}
+  //receivechar();
+  switch(state) {
+    case RECEIVING: {
+      while(Serial1.available()) {
+          buffer[pos] = Serial1.read();
+          if(buffer[0] != SIG) {
+            pos = 0;            
+            continue; // keep going till we get a packet starting with the signature
+          }
+          pos++;
+          if(pos > 7) {
+            pos = 0;
+            if(buffer[0] == SIG) {
+              time_start = millis();
+              state = READY;
+            }
+              
+            
+            break;
 
-  Serial.println("Trying to read 6 bytes");
-  for(int i = 0; i < 6; i++) {
-    uint8_t c;
-    if(buf.pop(c)) {
-      buffer[i] = (char)c;
-      Serial.print("Read ");
-      Serial.print(c);
-      Serial.print(" which is ");
-      Serial.print((char) c);
-      Serial.println(" into buffer");
-    }
+          }
+        }
+    };
+    case READY: {
+      for(int i = 1; i < 6; i++) {
+        Serial.write(buffer[i]);
+        delay(1);
+      }
+      Serial.println();
+      memset(buffer, 0, 7); // clear the buffer for now
+      state = IDLE;
+    };
+    case IDLE: {
+      if(millis() > time_start + period) {
+        //Serial1.flush();
+        state = RECEIVING;
+      }
+    };
   }
-  Serial.println("");
-  if(buffer == "hello\n") {
-    //Serial.println("received handshake");
-  }
-  for(int i = 0; i < 6; i++) {
-    //Serial.print((uint8_t) buffer[i]);
-    //Serial.print(" ");
-  }
-  //Serial.println();
-  //Serial.print(buffer);
 }
 
 
@@ -55,7 +73,7 @@ void receivechar() {
 
   
   //Serial1.readBytes(buffer, 6);
-  buf.push(Serial1.read());
+  //buf.push(Serial1.read());
 
   //Serial1.flush();
 }

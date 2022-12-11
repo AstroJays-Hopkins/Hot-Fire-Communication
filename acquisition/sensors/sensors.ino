@@ -1,3 +1,4 @@
+#include <RingBuf.h>
 #include <Adafruit_MAX31855.h>
 #include "atmega-adc/atmega-adc.h"
 
@@ -58,19 +59,29 @@ void setup() {
   sei();
 }
 
+#define PT_1_CONS 200
+#define PT_2_CONS 200
+
+RingBuf<float, 100> PT_1_buf;
+RIngBuf<float, 100> PT_2_buf;
+
 void PT_interrupt(uint8_t pin, uint16_t value) {
   switch(pin) {
     case PT_1: {
-
+        float val = value/1024 * PT_1_CONS;
+        PT_1_buf.push(val);
     };
     case PT_2: {
-
+        float val = value/1024 * PT_2_CONS;
+        PT_2_buf.push(val);
     };
     default: {
-      // handle this case
+      // do nothing
     };
   }
 }
+
+
 
 void error(String error) {
 
