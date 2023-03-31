@@ -1,34 +1,40 @@
-void setup() {
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  Serial1.begin(9600);
-  Serial.begin(9600);
 
-  digitalWrite(3, HIGH); // transmit on 
-  digitalWrite(2, LOW); // receive off
+#include "RS485_protocol.h"
 
+const byte ENABLE_PIN = 4;
+
+void fWrite (const byte what){
+  Serial.write(what);  
 }
-int i = 0;
-void loop() {
-  Serial1.write(0x53);
-  //Serial1.print(i);
-  //i++;
-  //i = i % 99999;
-  Serial1.print("hello");
-  delay(50);
-
-}
-
-void sendchar(char c[]) { 
-  digitalWrite(3, HIGH); // transmit on 
-  digitalWrite(2, LOW); // receive off
-  Serial1.println(c);
-}
-
-void readrequest() {
   
+int fAvailable(){
+  return Serial.available();  
 }
 
-void writerequest(char data[]) {
-
+int fRead(){
+  return Serial.read();  
 }
+
+void setup(){
+  Serial.begin (28800);
+  pinMode (ENABLE_PIN, OUTPUT);  // driver output enable
+  pinMode (LED_PIN, OUTPUT);  // built-in LED
+}  // end of setup
+  
+byte old_level = 0;
+
+void loop(){
+  // send to slave  
+  digitalWrite (ENABLE_PIN, HIGH);  // enable sending
+  sendMsg (fWrite, msg, sizeof msg);
+
+  while (!(UCSR0A & (1 << UDRE0)))  // Wait for empty transmit buffer
+  UCSR0A |= 1 << TXC0;  // mark transmission not complete
+  while (!(UCSR0A & (1 << TXC0)));   // Wait for the transmission to complete
+
+  digitalWrite (ENABLE_PIN, LOW);  // disable sending
+
+  // receive response  
+  byte buf [10];
+  byte received = recvMsg (fAvailable, fRead, buf, sizeof buf);
+}  // end of loop
