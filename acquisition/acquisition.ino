@@ -1,49 +1,32 @@
 #include "RS485_protocol.h"
 
-const byte ENABLE_PIN = 4;
+const byte ENABLE_PIN = 2;
 
 void fWrite(const byte what){
-  Serial.write(what);  
+  Serial1.write(what);  
 }
   
 int fAvailable(){
-  return Serial.available();  
+  return Serial1.available();  
 }
 
 int fRead(){
-  return Serial.read();  
+  return Serial1.read();  
 }
   
 void setup(){
-  Serial.begin (28800);
-  pinMode (ENABLE_PIN, OUTPUT);  // driver output enable
+  Serial1.begin(115200);
+  Serial.begin(9600);
+  pinMode(ENABLE_PIN, OUTPUT);  // driver output enable
+  digitalWrite(ENABLE_PIN, LOW);
 }
 
 void loop(){
-  byte buf [10];
+  byte buf [7];
   
   byte received = recvMsg (fAvailable, fRead, buf, sizeof (buf));
+
+  buf[6] = 0;
+  Serial.println((char *)buf);
   
-  if (received){
-    if (buf [0] != 1)
-      return;  // not my device
-      
-    if (buf [1] != 2)
-      return;  // unknown command
-    
-    byte msg [] = {
-       0,  // device 0 (master)
-       3,  // turn light on command received
-    };
-    
-    delay (1);  // give the master a moment to prepare to receive
-    digitalWrite (ENABLE_PIN, HIGH);  // enable sending
-    sendMsg (fWrite, msg, sizeof msg);
-
-    while (!(UCSR0A & (1 << UDRE0)))  // Wait for empty transmit buffer
-    UCSR0A |= 1 << TXC0;  // mark transmission not complete
-    while (!(UCSR0A & (1 << TXC0)));   // Wait for the transmission to complete
-
-    digitalWrite (ENABLE_PIN, LOW);  // disable sending
-  }  // end if something received
 }  // end of loop
