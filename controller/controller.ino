@@ -1,12 +1,20 @@
-
 #include "RS485_protocol.h"
+#include "protocol.h"
 
 const byte ENABLE_PIN = 2;
 
 // callback routines
   
 void fWrite (const byte what){
+  digitalWrite(ENABLE_PIN, HIGH);
   Serial1.write(what);  
+
+  while (!(UCSR1A & (1 << UDRE1))){
+    UCSR1A |= 1 << TXC1;
+  }
+  while (!(UCSR1A & (1 << TXC1)));
+
+  digitalWrite (ENABLE_PIN, LOW);
 }
   
 int fAvailable(){
@@ -14,21 +22,43 @@ int fAvailable(){
 }
 
 int fRead(){
-  return Serial1.read();  
+  digitalWrite(ENABLE_PIN, LOW);
+  int data = Serial1.read();  
+  return data;
 }
 
 void setup(){
   Serial1.begin (115200);
+  Serial.begin(9600);
   pinMode (ENABLE_PIN, OUTPUT);  // driver output enable
 }  // end of setup
   
+unsigned long counter = 0;
+
 void loop(){
-  const byte msg [] = "Shello";
+  Response packet;
+
+  packet.type = 1;
+  packet.counter = counter;
+
+  counter++;
+
+  byte * packet_addr = (byte *)(&packet);
 
   // send to slave  
-  digitalWrite(ENABLE_PIN, HIGH);  // enable sending
-  sendMsg (fWrite, msg, sizeof(msg));
-  delayMicroseconds (1220);
-  digitalWrite (ENABLE_PIN, LOW);  // disable sending
-  delay(10);
+  sendMsg (fWrite, packet_addr, sizeof(packet));
+
+  byte buf [10];
+  
+  byte received = recvMsg (fAvailable, fRead, buf, sizeof (buf));
+
+  Response * packet_ptr = (Response *) buf;
+  Serial.print("header: ");
+  Serial.println(packet_ptr->header);
+  Serial.print("type: ");
+  Serial.println(packet_ptr->type);
+  Serial.print("counter: ");
+  Serial.println(packet_ptr->counter);
+
+  
 }  // end of loop
