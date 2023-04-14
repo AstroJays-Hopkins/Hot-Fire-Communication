@@ -44,48 +44,34 @@ byte buf [10];
 int attempts = 0;
 
 void loop(){
-  Serial.print("State:");
-  Serial.println(commstate);
-  switch(commstate){
-    case CommStateMachine::SENDING:
-      Response packet;
+  Response packet;
 
-      packet.type = 1;
-      packet.counter = counter;
+  packet.type = 2;
+  packet.counter = counter;
 
-      counter++;
+  counter++;
 
-      byte * packet_addr = (byte *)(&packet);
+  byte * packet_addr = (byte *)(&packet);
 
-      // send to slave  
-      sendMsg(fWrite, packet_addr, sizeof(packet));
-      commstate = CommStateMachine::WAITING;
-      break;
-    
-    case CommStateMachine::WAITING:
-      if(attempts < 3){
-        byte received = recvMsg(fAvailable, fRead, buf, sizeof (buf));
-        if(received){
-          Response * packet_ptr = (Response *) buf;
-          Serial.print("header: ");
-          Serial.println(packet_ptr->header);
-          Serial.print("type: ");
-          Serial.println(packet_ptr->type);
-          Serial.print("counter: ");
-          Serial.println(packet_ptr->counter);
+  // send to slave  
+  delay(5);
+  sendMsg(fWrite, packet_addr, sizeof(packet));
 
-          commstate = CommStateMachine::SENDING;
-          attempts = 0;
-        } 
-        else{
-          attempts++;
-          delay(1);
-        }
-      }
-      else {
-        attempts = 0;
-        commstate = CommStateMachine::SENDING;
-      }
-      break;
+  // receive response  
+  byte buf [10];
+  
+  byte received = recvMsg (fAvailable, fRead, buf, sizeof buf);
+
+  if (received){
+    Response * packet_ptr = (Response *) buf;
+    Serial.print("header: ");
+    Serial.println(packet_ptr->header);
+    Serial.print("type: ");
+    Serial.println(packet_ptr->type);
+    Serial.print("counter: ");
+    Serial.println(packet_ptr->counter);
   }
+
+  
+  
 }  // end of loop
