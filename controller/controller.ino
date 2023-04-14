@@ -54,7 +54,7 @@ void loop(){
   byte * packet_addr = (byte *)(&packet);
 
   // send to slave  
-  delay(5);
+  delay(1);
   sendMsg(fWrite, packet_addr, sizeof(packet));
 
   // receive response  
@@ -75,3 +75,28 @@ void loop(){
   
   
 }  // end of loop
+
+
+
+
+/*
+Acquisition
+Board - Tranciever
+GND - GND
+2 - RT
+TX1 - RX
+RX1 - TX
+5V - 5V
+*/
+
+/*
+Controller
+Board - Tranciever
+GND - GND
+2 - RT
+TX1 - RX
+RX1 - TX
+5V - 5V
+
+
+*/

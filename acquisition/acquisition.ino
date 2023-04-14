@@ -68,6 +68,6 @@ void loop(){
 
   byte * packet_addr = (byte *)(&packet);
   
-  delay (5);  // give the master a moment to prepare to receive
+  delay (1);  // give the master a moment to prepare to receive
   sendMsg(fWrite, packet_addr, sizeof(packet));    
 }  // end of loop
