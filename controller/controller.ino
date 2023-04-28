@@ -39,15 +39,19 @@ enum CommStateMachine {SENDING, WAITING};
 
 CommStateMachine commstate = CommStateMachine::SENDING;
 
-byte buf [10];
-
 int attempts = 0;
+
+byte buf [18];
 
 void loop(){
   Response packet;
 
   packet.type = 2;
   packet.counter = counter;
+  packet.tc1 = 0;
+  packet.tc2 = 0;
+  packet.pt1 = 0;
+  packet.pt2 = 0;
 
   counter++;
 
@@ -58,18 +62,12 @@ void loop(){
   sendMsg(fWrite, packet_addr, sizeof(packet));
 
   // receive response  
-  byte buf [10];
-  
-  byte received = recvMsg (fAvailable, fRead, buf, sizeof buf);
+  byte received = recvMsg (fAvailable, fRead, buf, sizeof(buf));
 
   if (received){
     Response * packet_ptr = (Response *) buf;
-    Serial.print("header: ");
-    Serial.println(packet_ptr->header);
-    Serial.print("type: ");
-    Serial.println(packet_ptr->type);
-    Serial.print("counter: ");
-    Serial.println(packet_ptr->counter);
+    Serial.write((char * ) packet_ptr, 22);
+    
   }
 
   
