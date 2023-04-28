@@ -1,79 +1,122 @@
-#include <RingBuf.h>
+#include "RS485_protocol.h"
+#include "protocol.h"
+#include <stdint.h>
+#include <Adafruit_MAX31855.h>
 
-void setup() {
-  Serial1.begin(9600);
-  Serial.begin(9600);
-  Serial.print("Acquisiton starting.");
+#define TC_DO 51
+#define TC_CLK 52
+#define TC_CS_R1 40
+#define TC_CS_R2 41
+
+Adafruit_MAX31855 TC_R1(TC_CLK, TC_CS_R1, TC_DO);
+Adafruit_MAX31855 TC_R2(TC_CLK, TC_CS_R2, TC_DO);
+
+void error(String error) {
+  Serial.println(error);
 }
 
 
-//RingBuf<uint8_t, 6> buf;
 
-#define SIG 0x53
-uint8_t buffer[7];
-int pos;
+const byte ENABLE_PIN = 2;
 
-enum state_t {IDLE, RECEIVING, READY};
+void fWrite(const byte what){
+  digitalWrite(ENABLE_PIN, HIGH);
+  Serial1.write(what);  
 
-
-state_t state = IDLE;
-
-unsigned long time_start = 0;
-int period = 100;
-
-void loop() {
-  // if we get a read_request
-  //receivechar();
-  switch(state) {
-    case RECEIVING: {
-      while(Serial1.available()) {
-          buffer[pos] = Serial1.read();
-          if(buffer[0] != SIG) {
-            pos = 0;            
-            continue; // keep going till we get a packet starting with the signature
-          }
-          pos++;
-          if(pos > 7) {
-            pos = 0;
-            if(buffer[0] == SIG) {
-              time_start = millis();
-              state = READY;
-            }
-              
-            
-            break;
-
-          }
-        }
-    };
-    case READY: {
-      for(int i = 1; i < 6; i++) {
-        Serial.write(buffer[i]);
-        delay(1);
-      }
-      Serial.println();
-      memset(buffer, 0, 7); // clear the buffer for now
-      state = IDLE;
-    };
-    case IDLE: {
-      if(millis() > time_start + period) {
-        //Serial1.flush();
-        state = RECEIVING;
-      }
-    };
+  while (!(UCSR1A & (1 << UDRE1))){
+    UCSR1A |= 1 << TXC1;
   }
+  while (!(UCSR1A & (1 << TXC1)));
+
+  digitalWrite (ENABLE_PIN, LOW);
+
 }
-
-
-
-void receivechar() {
-  digitalWrite(3, LOW); // transmit on 
-  digitalWrite(2, HIGH); // receive off
-  int i = 0;
-
   
-  //Serial1.readBytes(buffer, 6);
-  //buf.push(Serial1.read());
-
-  //Serial1.flush();
+int fAvailable(){
+  return Serial1.available();  
 }
+
+int fRead(){
+  digitalWrite(ENABLE_PIN, LOW);
+  int data = Serial1.read();  
+  return data;
+}
+  
+void setup(){
+  Serial1.begin(115200);
+  Serial.begin(9600);
+  pinMode(ENABLE_PIN, OUTPUT);  // driver output enable
+
+  delay(500);
+  if (!TC_R1.begin()) {
+    error("Thermocouple R1 error.");
+  }
+  Serial.println("Thermo 1 complete");
+  if (!TC_R2.begin()) {
+    error("Thermocouple R2 error.");
+  }
+  Serial.println("Thermo 2 complete");
+
+
+  delay(500);
+  double c = TC_R1.readCelsius();
+  if (isnan(c)) {
+    error("TC_R1 Thermocouple fault( detected!");
+    uint8_t e = TC_R1.readError();
+    if (e & MAX31855_FAULT_OPEN) error("TC_R1 FAULT: Thermocouple is open - no connections.");
+    if (e & MAX31855_FAULT_SHORT_GND) Serial.println("TC_R1 FAULT: Thermocouple is short-circuited to GND.");
+    if (e & MAX31855_FAULT_SHORT_VCC) Serial.println("TC_R1 FAULT: Thermocouple is short-circuited to VCC.");
+  }
+  Serial.println("Thermo 1 read complete");
+  Serial.println(c);
+
+
+  c = TC_R2.readCelsius();
+  if (isnan(c)) {
+    error("TC_R2 Thermocouple fault(s) detected!");
+    uint8_t e = TC_R2.readError();
+    if (e & MAX31855_FAULT_OPEN) error("TC_R2 FAULT: Thermocouple is open - no connections.");
+    if (e & MAX31855_FAULT_SHORT_GND) error("TC_R2 FAULT: Thermocouple is short-circuited to GND.");
+    if (e & MAX31855_FAULT_SHORT_VCC) error("TC_R2 FAULT: Thermocouple is short-circuited to VCC.");
+  }
+
+  Serial.println("Thermo 2 read complete");
+  Serial.println(c);
+
+}
+
+unsigned long counter = 0;
+
+int attempts = 0;
+
+byte buf [18];
+
+void loop(){
+  byte received = recvMsg (fAvailable, fRead, buf, sizeof (buf));
+
+  if (received){
+    Response * packet_ptr = (Response *) buf;
+    Serial.print("header: ");
+    Serial.println(packet_ptr->header);
+    Serial.print("type: ");
+    Serial.println(packet_ptr->type);
+    Serial.print("counter: ");
+    Serial.println(packet_ptr->counter);
+  }
+
+  Response packet;
+
+  packet.type = 1;
+  packet.counter = counter;
+  packet.tc1 = TC_R1.readCelsius();
+  packet.tc2 = TC_R2.readCelsius();
+  packet.pt1 = analogRead(A0);
+  packet.pt2 = analogRead(A1);
+
+  counter++;
+
+  byte * packet_addr = (byte *)(&packet);
+  
+  delay (1);  // give the master a moment to prepare to receive
+  sendMsg(fWrite, packet_addr, sizeof(packet));    
+}  // end of loop
