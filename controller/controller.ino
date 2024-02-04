@@ -8,13 +8,10 @@ const byte ENABLE_PIN = 22;
   
 void fWrite (const byte what){
   Serial1.write(what);  
-
-  while (!(UCSR1A & (1 << UDRE1))){
+  /*while (!(UCSR1A & (1 << UDRE1))){
     UCSR1A |= 1 << TXC1;
   }
-  while (!(UCSR1A & (1 << TXC1)));
-
-  
+  while (!(UCSR1A & (1 << TXC1)));*/
 }
   
 int fAvailable(){
@@ -28,7 +25,7 @@ int fRead(){
 }
 
 void setup(){
-  Serial1.begin (115200);
+  Serial1.begin (9600);
   Serial.begin(9600);
   pinMode (ENABLE_PIN, OUTPUT);  // driver output enable
   digitalWrite(ENABLE_PIN, LOW);
@@ -38,18 +35,23 @@ unsigned long counter = 0;
 
 int attempts = 0;
 
-byte buf [22];
+void printPacket(Response * packet) {
+    Serial.print("Header: ");
+    Serial.println(packet->header & 0xFF, HEX);
+    Serial.print("Type: ");
+    Serial.println(packet->type);
+    Serial.print("Counter: ");
+    Serial.println(packet->counter);    
+}
 
 void loop(){
   Response packet;
 
   // receive response  
-  byte received = recvMsg (fAvailable, fRead, buf, sizeof(buf));
+  byte received = recvMsg (fAvailable, fRead, (char*) &packet, sizeof(Response));
 
-  if (received){
-    Response * packet_ptr = (Response *) buf;
-    Serial.write((char * ) packet_ptr, 22);
-    
+  if (received == sizeof(Response)){
+    printPacket(&packet);
   }
 
 }  // end of loop

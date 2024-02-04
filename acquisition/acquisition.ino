@@ -1,7 +1,7 @@
 #include "RS485_protocol.h"
 #include "protocol.h"
 #include <stdint.h>
-#include <Adafruit_MAX31855.h>
+
 
 void error(String error) {
   Serial.println(error);
@@ -9,13 +9,8 @@ void error(String error) {
 
 const byte ENABLE_PIN = 22;
 
-void fWrite(const byte what){
-  Serial1.write(what);  
-
-  while (!(UCSR1A & (1 << UDRE1))){
-    UCSR1A |= 1 << TXC1;
-  }
-  while (!(UCSR1A & (1 << TXC1)));
+void fWrite(const byte what){ 
+  Serial1.write(what);    
 }
   
 int fAvailable(){
@@ -29,7 +24,7 @@ int fRead(){
 }
   
 void setup(){
-  Serial1.begin(115200);
+  Serial1.begin(9600);
   Serial.begin(9600);
   pinMode(ENABLE_PIN, OUTPUT);  // driver output enable
   digitalWrite(ENABLE_PIN, HIGH);
@@ -39,7 +34,6 @@ unsigned long counter = 0;
 
 int attempts = 0;
 
-byte buf [18];
 
 void loop(){
   Response packet;
@@ -53,7 +47,15 @@ void loop(){
 
   counter++;
 
-  byte * packet_addr = (byte *)(&packet);
-  
-  sendMsg(fWrite, packet_addr, sizeof(packet));    
+  // toggle the direction for duration of the entire packet
+  digitalWrite(ENABLE_PIN, HIGH);
+  sendMsg(fWrite, (char*) &packet, sizeof(Response));
+
+  // wait until TX buffer has emptied before sending another packet
+  while (!(UCSR1A & (1 << UDRE1))){
+    UCSR1A |= 1 << TXC1;
+  }
+  while (!(UCSR1A & (1 << TXC1)));
+  digitalWrite(ENABLE_PIN, LOW);
+
 }  // end of loop
